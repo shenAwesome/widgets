@@ -19,7 +19,7 @@ type Action = () => void
 function observe<T>(model: T, renderer: (
     model: T & { set: (state: Partial<T>) => void },
     addCleanup: (cleanup: Action) => void,
-    changed: (deps: (keyof T)[], onChange: () => Action | void) => void
+    changed: (deps: (keyof T)[], action: () => Action | void) => void
 ) => Action | void) {
 
     const lastRendered = {
@@ -37,7 +37,7 @@ function observe<T>(model: T, renderer: (
         doRender()
     }
 
-    function changed(deps: (keyof T)[], onChange: () => Action | void) {
+    function changed(deps: (keyof T)[], action: () => Action | void) {
         if (!isRendering) {
             console.error('changed() called outside of rendering')
             return
@@ -47,7 +47,7 @@ function observe<T>(model: T, renderer: (
             depsHasChanged = deps.some(key => lastRendered.state[key] != model[key]);
         if (depsHasChanged) {
             if (cleanups[key]) cleanups[key]()
-            cleanups[key] = onChange() || null
+            cleanups[key] = action() || null
         }
     }
 
