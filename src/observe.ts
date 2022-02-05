@@ -10,19 +10,20 @@ function debounce<T extends Function>(func: T, timeout = 1) {
 
 type Action = () => void
 
+
 function observe<T>(
     model: T,
     renderer: (
-        state: T,
-        setState: (state: Partial<T>) => void,
-        addRemover: (remover: Action) => void,
+        model: T & { set: (state: Partial<T>) => void },
+        addCleanup: (cleanup: Action) => void,
         changed: (onChange: () => Action | void, deps?: (keyof T)[]) => void
     ) => Action | void
 ) {
+
     const lastRendered = {
         state: {} as T,
-        removers: [] as Action[],
-        removers_changed: {} as { [key: string]: Action }
+        cleanups: [] as Action[],
+        cleanups_changed: {} as { [key: string]: Action }
     }
 
     function setState(change: Partial<T>) {
@@ -31,54 +32,62 @@ function observe<T>(
     }
 
     function changed(onChange: () => Action | void, deps: (keyof T)[]) {
-        const removers = lastRendered.removers_changed,
-            key = deps.join(','),
-            remover = removers[key]
-        if (remover) remover()
-        const depsHasChanged = deps.some(key => lastRendered.state[key] != model[key])
+        const cleanups = lastRendered.cleanups_changed,
+            key = deps.join('_'),
+            depsHasChanged = deps.some(key => lastRendered.state[key] != model[key]);
         if (depsHasChanged) {
-            const ret = onChange()
-            removers[key] = ret || null
+            if (cleanups[key]) cleanups[key]()
+            cleanups[key] = onChange() || null
         }
     }
 
-    function addRemover(remover: Action) {
-        lastRendered.removers.push(remover)
+    function addCleanup(remover: Action) {
+        lastRendered.cleanups.push(remover)
     }
 
     const doRender = debounce(() => {
-        lastRendered.removers.forEach(r => r())
-        lastRendered.removers.length = 0
-        const ret = renderer(model, setState, addRemover, changed)
-        if (ret) addRemover(ret)
+        lastRendered.cleanups.forEach(r => r())
+        lastRendered.cleanups.length = 0
+        const ret = renderer(enhanced, addCleanup, changed)
+        if (ret) addCleanup(ret)
         lastRendered.state = { ...model }
     })
 
-    const ret = {
-        state: model,
-        setState
-    }
+
+    const enhanced = {
+        set: setState
+    } as (T & {
+        set: (state: Partial<T>) => void,
+        data: (key: string, obj?: any) => void
+    })
 
     Object.keys(model).forEach(key => {
         const prop = key as keyof T
-        Object.defineProperty(ret, prop, {
+        Object.defineProperty(enhanced, prop, {
             get: () => model[prop],
             set: val => {
-                setState({ prop: val } as any)
+                const change = { prop: val } as any
+                if (key.startsWith('_')) {//doesn't trigger render for private props
+                    Object.assign(model, change)
+                } else {
+                    setState(change)
+                }
             }
         })
     })
 
-    return ret as (T & typeof ret)
+    setState({})//init
+
+    return enhanced
 }
 
 const test = observe({
     age: 1
-}, (state, setState, addRemover, changed) => {
+}, (model, addCleanup, changed) => {
     changed(() => {
 
     }, ["age"])
-    setState({
+    model.set({
         age: 1
     })
 })
