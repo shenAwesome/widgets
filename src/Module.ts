@@ -17,7 +17,6 @@ class Module<T>{
         cleanups: [] as Action[],
         cleanups_changed: {} as { [key: string]: Action }
     }
-    _isRendering = false
 
     constructor() {
         this.doRender = debounce(this.doRender)
@@ -49,10 +48,11 @@ class Module<T>{
     doRender() {
         const self = this,
             lastRendered = this._lastRendered,
-            { state, listeners } = this
+            { state } = this
 
+        let rendering = true
         function changed(deps: (keyof T)[], action: () => Action | void) {
-            if (!self._isRendering) {
+            if (!rendering) {
                 console.error('changed() called outside of rendering')
                 return
             }
@@ -64,22 +64,20 @@ class Module<T>{
                 cleanups[key] = action() || null
             }
         }
-
         function addCleanup(remover: Action) {
-            if (!self._isRendering) {
+            if (!rendering) {
                 console.error('addCleanup() called outside of rendering')
                 return
             }
             lastRendered.cleanups.push(remover)
         }
-        this._isRendering = true
         lastRendered.cleanups.forEach(r => r())
         lastRendered.cleanups.length = 0
-        const ret = this.render(changed, addCleanup)
+        const ret = this.render(state, changed, addCleanup)
         if (ret) addCleanup(ret)
         lastRendered.state = { ...state }
-        listeners.forEach(l => l())
-        this._isRendering = false
+        this.listeners.forEach(l => l())
+        rendering = false
     }
 
     async start() {
@@ -87,6 +85,7 @@ class Module<T>{
     }
 
     render(
+        state: T,
         changed: (deps: (keyof T)[], action: () => Action | void) => void,
         addCleanup: (remover: Action) => void
     ): Action | void {
