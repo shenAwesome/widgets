@@ -59,6 +59,18 @@ function observe<T>(model: T, renderer: (
         lastRendered.cleanups.push(remover)
     }
 
+    let listeners = [] as Action[]
+
+    function onChange(action: Action) {
+        const listener = () => action()
+        listeners.push(listener)
+        return {
+            remove: () => {
+                listeners = listeners.filter(l => l !== listener)
+            }
+        }
+    }
+
     let isRendering = false
 
     const doRender = debounce(() => {
@@ -68,12 +80,14 @@ function observe<T>(model: T, renderer: (
         const ret = renderer(enhanced, addCleanup, changed)
         if (ret) addCleanup(ret)
         lastRendered.state = { ...model }
+        listeners.forEach(l => l())
         isRendering = false
     }, 1)
 
     const enhanced = {
-        set: setState
-    } as (T & { set: (state: Partial<T>) => void })
+        set: setState,
+        onChange
+    } as (T & { set: (state: Partial<T>) => void, onChange: (action: Action) => { remove: Action } })
 
     Object.keys(model).forEach(key => {
         const prop = key as keyof T,
@@ -108,6 +122,7 @@ const test = observe({
     model.age = 100
     */
 })
+
 
 export { observe }
 
