@@ -2,7 +2,7 @@
 function debounce<T extends Function>(func: T, timeout = 1) {
     let timer = -1;
     function newFn(...args: any[]) {
-        clearTimeout(timer)
+        window.clearTimeout(timer)
         timer = window.setTimeout(() => { func.apply(null, args) }, timeout);
     }
     return (newFn as any) as T
@@ -27,11 +27,19 @@ function observe<T>(
     }
 
     function setState(change: Partial<T>) {
+        if (isRendering) {
+            console.error('setState called during rendering')
+            return
+        }
         Object.assign(model, change)
         doRender()
     }
 
     function changed(onChange: () => Action | void, deps: (keyof T)[]) {
+        if (!isRendering) {
+            console.error('changed called outside of rendering')
+            return
+        }
         const cleanups = lastRendered.cleanups_changed,
             key = deps.join('_'),
             depsHasChanged = deps.some(key => lastRendered.state[key] != model[key]);
@@ -42,17 +50,24 @@ function observe<T>(
     }
 
     function addCleanup(remover: Action) {
+        if (!isRendering) {
+            console.error('addCleanup called outside of rendering')
+            return
+        }
         lastRendered.cleanups.push(remover)
     }
 
+    let isRendering = false
+
     const doRender = debounce(() => {
+        isRendering = true
         lastRendered.cleanups.forEach(r => r())
         lastRendered.cleanups.length = 0
         const ret = renderer(enhanced, addCleanup, changed)
         if (ret) addCleanup(ret)
         lastRendered.state = { ...model }
+        isRendering = false
     })
-
 
     const enhanced = {
         set: setState
@@ -87,9 +102,13 @@ const test = observe({
     changed(() => {
 
     }, ["age"])
+    //dont call set in render
+    /*
     model.set({
         age: 1
     })
+    model.age = 100
+    */
 })
 
 export { observe }
