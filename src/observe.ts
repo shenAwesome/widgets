@@ -10,15 +10,17 @@ function debounce<T extends Function>(func: T, timeout = 1) {
 
 type Action = () => void
 
-
-function observe<T>(
-    model: T,
-    renderer: (
-        model: T & { set: (state: Partial<T>) => void },
-        addCleanup: (cleanup: Action) => void,
-        changed: (onChange: () => Action | void, deps?: (keyof T)[]) => void
-    ) => Action | void
-) {
+/**
+ * observe change to model
+ * @param model 
+ * @param renderer 
+ * @returns 
+ */
+function observe<T>(model: T, renderer: (
+    model: T & { set: (state: Partial<T>) => void },
+    addCleanup: (cleanup: Action) => void,
+    changed: (deps: (keyof T)[], onChange: () => Action | void) => void
+) => Action | void) {
 
     const lastRendered = {
         state: {} as T,
@@ -28,16 +30,16 @@ function observe<T>(
 
     function setState(change: Partial<T>) {
         if (isRendering) {
-            console.error('setState called during rendering')
+            console.error('setState() called during rendering')
             return
         }
         Object.assign(model, change)
         doRender()
     }
 
-    function changed(onChange: () => Action | void, deps: (keyof T)[]) {
+    function changed(deps: (keyof T)[], onChange: () => Action | void) {
         if (!isRendering) {
-            console.error('changed called outside of rendering')
+            console.error('changed() called outside of rendering')
             return
         }
         const cleanups = lastRendered.cleanups_changed,
@@ -51,7 +53,7 @@ function observe<T>(
 
     function addCleanup(remover: Action) {
         if (!isRendering) {
-            console.error('addCleanup called outside of rendering')
+            console.error('addCleanup() called outside of rendering')
             return
         }
         lastRendered.cleanups.push(remover)
@@ -67,20 +69,16 @@ function observe<T>(
         if (ret) addCleanup(ret)
         lastRendered.state = { ...model }
         isRendering = false
-    })
+    }, 1)
 
     const enhanced = {
         set: setState
-    } as (T & {
-        set: (state: Partial<T>) => void,
-        data: (key: string, obj?: any) => void
-    })
+    } as (T & { set: (state: Partial<T>) => void })
 
     Object.keys(model).forEach(key => {
-        const prop = key as keyof T
-        Object.defineProperty(enhanced, prop, {
-            get: () => model[prop],
-            set: val => {
+        const prop = key as keyof T,
+            get = () => model[prop],
+            set = (val: any) => {
                 const change = { prop: val } as any
                 if (key.startsWith('_')) {//doesn't trigger render for private props
                     Object.assign(model, change)
@@ -88,7 +86,7 @@ function observe<T>(
                     setState(change)
                 }
             }
-        })
+        Object.defineProperty(enhanced, prop, { get, set })
     })
 
     setState({})//init
@@ -99,9 +97,9 @@ function observe<T>(
 const test = observe({
     age: 1
 }, (model, addCleanup, changed) => {
-    changed(() => {
+    changed(["age"], () => {
 
-    }, ["age"])
+    })
     //dont call set in render
     /*
     model.set({
