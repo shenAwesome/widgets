@@ -1,5 +1,6 @@
 
 import $ from "cash-dom"
+import { observe } from "./observe";
 import { SElement } from './SElement';
 
 class PopUp extends SElement {
@@ -41,3 +42,15 @@ app.innerHTML = `<div>
 $(app).find('s-range').on('change', (e) => {
   console.log(e.target.value)
 })
+
+const test = observe({
+  age: 1,
+  addAge(num: number) {
+    this.age = this.age + num
+  }
+}, (model, addCleanup, changed) => {
+  console.log('rendering')
+  console.log(model.age)
+})
+
+test.addAge(100) 

@@ -90,39 +90,26 @@ function observe<T>(model: T, renderer: (
     } as (T & { set: (state: Partial<T>) => void, onChange: (action: Action) => { remove: Action } })
 
     Object.keys(model).forEach(key => {
-        const prop = key as keyof T,
-            get = () => model[prop],
-            set = (val: any) => {
-                const change = { prop: val } as any
+        const prop = key as keyof T
+        if (model[prop] instanceof Function) {
+            enhanced[prop] = model[prop] as any
+        } else {
+            const get = () => model[prop], set = (val: any) => {
+                const change = { [prop]: val } as any
                 if (key.startsWith('_')) {//doesn't trigger render for private props
                     Object.assign(model, change)
                 } else {
                     setState(change)
                 }
             }
-        Object.defineProperty(enhanced, prop, { get, set })
+            Object.defineProperty(enhanced, prop, { get, set })
+        }
     })
 
     setState({})//init
 
     return enhanced
 }
-
-const test = observe({
-    age: 1
-}, (model, addCleanup, changed) => {
-    changed(["age"], () => {
-
-    })
-    //dont call set in render
-    /*
-    model.set({
-        age: 1
-    })
-    model.age = 100
-    */
-})
-
 
 export { observe }
 
