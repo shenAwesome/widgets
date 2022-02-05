@@ -54,20 +54,30 @@ function observe<T>(
         lastRendered.state = { ...model }
     })
 
-    return {
+    const ret = {
         state: model,
         setState
     }
+
+    Object.keys(model).forEach(key => {
+        const prop = key as keyof T
+        Object.defineProperty(ret, prop, {
+            get: () => model[prop],
+            set: val => {
+                setState({ prop: val } as any)
+            }
+        })
+    })
+
+    return ret as (T & typeof ret)
 }
 
-observe({
+const test = observe({
     age: 1
 }, (state, setState, addRemover, changed) => {
-
     changed(() => {
 
     }, ["age"])
-
     setState({
         age: 1
     })
