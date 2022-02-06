@@ -4,11 +4,12 @@ type Action = () => void
 
 class Module<T = any, C = any>{
 
-    id: string
-    state = {} as T
-    config = {} as C
-    deps = {} as { [key: string]: Module }
-    bench: Bench
+    readonly id: string
+    readonly state = {} as T
+    readonly config = {} as C
+    readonly deps = {} as { [key: string]: Module }
+
+    protected bench: Bench
 
     private _listeners = [] as Action[]
 
@@ -85,11 +86,10 @@ class Module<T = any, C = any>{
     }
 }
 
-
-
 class Bench {
 
-    modules = {} as { [id: string]: Module }
+    readonly store = new DataStore
+    readonly modules = {} as { [id: string]: Module }
 
     constructor(modules: { [key: string]: new () => Module }, autoStart = true) {
         _.forEach(modules, (Cls, name) => {
@@ -148,8 +148,6 @@ class Bench {
             return false
         }
     }
-
-    store = new DataStore
 }
 
 class DataStore {
