@@ -1,16 +1,14 @@
-
-function debounce<F extends (...params: any[]) => void>(fn: F, delay = 1) {
-    let timeoutID: number = null;
-    return function (this: void, ...args: any[]) {
-        clearTimeout(timeoutID);
-        timeoutID = window.setTimeout(() => fn.apply(this, args), delay);
-    } as F;
-}
+import _ from "lodash";
 
 type Action = () => void
 
-class Module<T>{
+class Module<T = any, C = any>{
+
+    id: string
     state = {} as T
+    config = {} as C
+    deps = {} as { [key: string]: Module }
+    bench: Bench
 
     private _listeners = [] as Action[]
 
@@ -21,7 +19,7 @@ class Module<T>{
     }
 
     constructor() {
-        this.doRender = debounce(this.doRender)
+        this.doRender = _.debounce(this.doRender, 1)
     }
 
     setState(change: Partial<T>) {
@@ -81,7 +79,70 @@ class Module<T>{
     ): Action | void {
         throw 'to be implemented'
     }
+
+    async start() {
+
+    }
 }
 
-export { Module }
+
+
+class Bench {
+
+    modules = {} as { [id: string]: Module }
+
+    constructor(modules: { [key: string]: new () => Module }) {
+        _.forEach(modules, (Cls, name) => {
+            const id = this.createID(name)
+            const m = new Cls, bench = this
+            this.modules[id] = Object.assign(m, { id, bench })
+        })
+        console.info("bench is starting :" + this.moduleIds.join(','))
+        this.start()
+    }
+
+    get moduleIds() {
+        return Object.keys(this.modules)
+    }
+
+    private createID(name: string) {
+        return _.camelCase(name.replace('Module', ''))
+    }
+
+    async start() {
+        const _config = JSON.parse(await (await fetch('./bench.json')).text()),
+            allConfig = {} as { [key: string]: any }
+        _.forEach(_config, (value, key) => {
+            allConfig[key.toUpperCase()] = value
+        })
+        //autowire module
+        const { modules } = this
+        const sorted = [] as Module[], toSort = _.values(modules)
+        while (toSort.length > 0) {
+            const ready = toSort.filter(m => {
+                return Object.keys(m.deps)
+                    .every(id => sorted.some(s => s.id == id))
+            })
+            if (ready.length == 0) break
+            sorted.push(...ready)
+            _.pullAll(toSort, ready)
+        }
+        sorted.push(...toSort)//drawback
+        sorted.forEach(m => {
+            Object.keys(m.deps).forEach(id => {
+                m.deps[id] = modules[id]
+            })
+        })
+        //start
+        for (const m of sorted) {
+            const config = allConfig[m.id.toUpperCase()]
+            Object.assign(m, { config })
+            await m.start()
+        }
+        //first render
+        for (const m of sorted) m.setState({})
+    }
+}
+
+export { Module, Bench }
 
