@@ -148,6 +148,25 @@ class Bench {
             return false
         }
     }
+
+    store = new DataStore
+}
+
+class DataStore {
+    private _data = {} as any
+
+    push(key: string, data: any) {
+        this._data[key] = this._data[key] || []
+        this._data[key].push(data)
+    }
+
+    get(key: string) {
+        return this._data[key]
+    }
+
+    set(key: string, data: any) {
+        this._data[key] = data
+    }
 }
 
 export { Module, Bench }
