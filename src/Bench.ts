@@ -134,13 +134,19 @@ class Bench {
             })
         })
         //start
-        for (const m of sorted) {
-            const config = allConfig[m.id.toUpperCase()]
-            Object.assign(m, { config })
-            await m.start()
+        try {
+            for (const m of sorted) {
+                const config = allConfig[m.id.toUpperCase()]
+                Object.assign(m, { config })
+                await m.start()
+            }
+            //first time rendering
+            for (const m of sorted) m.setState({})
+            return true
+        } catch (e) {
+            console.info('start stopped', e)
+            return false
         }
-        //first render
-        for (const m of sorted) m.setState({})
     }
 }
 

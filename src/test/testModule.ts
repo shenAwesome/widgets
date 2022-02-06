@@ -20,6 +20,10 @@ class TestModule extends Module {
   render() {
     console.log('test')
   }
+
+  async start() {
+    throw "haha"
+  }
 }
 
 class TestModule2 extends Module {
