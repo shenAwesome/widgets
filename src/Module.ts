@@ -12,7 +12,9 @@ type Action = () => void
 class Module<T>{
     state = {} as T
 
-    _lastRendered = {
+    private _listeners = [] as Action[]
+
+    private _lastRendered = {
         state: {} as T,
         cleanups: [] as Action[],
         cleanups_changed: {} as { [key: string]: Action }
@@ -27,27 +29,19 @@ class Module<T>{
         this.doRender()
     }
 
-    async doStart() {
-        await this.start()
-        this.doRender()
-    }
-
-    listeners = [] as Action[]
-
     onChange(action: Action) {
-        const { listeners } = this
+        const { _listeners: listeners } = this
         const listener = () => action()
         listeners.push(listener)
         return {
             remove: () => {
-                this.listeners = listeners.filter(l => l !== listener)
+                this._listeners = listeners.filter(l => l !== listener)
             }
         }
     }
 
-    doRender() {
-        const self = this,
-            lastRendered = this._lastRendered,
+    private doRender() {
+        const lastRendered = this._lastRendered,
             { state } = this
 
         let rendering = true
@@ -76,15 +70,11 @@ class Module<T>{
         const ret = this.render(state, changed, addCleanup)
         if (ret) addCleanup(ret)
         lastRendered.state = { ...state }
-        this.listeners.forEach(l => l())
+        this._listeners.forEach(l => l())
         rendering = false
     }
 
-    async start() {
-        throw 'to be implemented'
-    }
-
-    render(
+    protected render(
         state: T,
         changed: (deps: (keyof T)[], action: () => Action | void) => void,
         addCleanup: (remover: Action) => void
