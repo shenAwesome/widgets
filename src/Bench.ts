@@ -91,14 +91,14 @@ class Bench {
 
     modules = {} as { [id: string]: Module }
 
-    constructor(modules: { [key: string]: new () => Module }) {
+    constructor(modules: { [key: string]: new () => Module }, autoStart = true) {
         _.forEach(modules, (Cls, name) => {
             const id = this.createID(name)
             const m = new Cls, bench = this
             this.modules[id] = Object.assign(m, { id, bench })
         })
         console.info("bench is starting :" + this.moduleIds.join(','))
-        this.start()
+        if (autoStart) this.start()
     }
 
     get moduleIds() {
@@ -142,8 +142,10 @@ class Bench {
             }
             //first time rendering
             for (const m of sorted) m.setState({})
+            return true
         } catch (e) {
             console.info('start stopped', e)
+            return false
         }
     }
 
