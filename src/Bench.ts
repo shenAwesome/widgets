@@ -86,6 +86,28 @@ class Module<T = any, C = any>{
     }
 }
 
+class ActiveModule<T = any, C = any> extends Module<T, C>{
+
+    protected onActive(): void | Action {
+        throw "not implemented"
+    }
+
+    private _ActiveCleanup = null as Action
+    isActive = true
+    setActive(isActive: boolean) {
+        if (isActive !== this.isActive) {
+            this.isActive = isActive
+            if (isActive) {
+                this._ActiveCleanup = this.onActive() || null
+            } else {//deactive
+                this._ActiveCleanup && this._ActiveCleanup()
+                this._ActiveCleanup = null
+            }
+            this.setState(null)
+        }
+    }
+}
+
 class Bench {
 
     readonly store = new DataStore
@@ -148,6 +170,13 @@ class Bench {
             return false
         }
     }
+
+    activate(moduleId: string, toggle = true) {
+        const activeModules = _.values(this.modules).filter(m => m instanceof ActiveModule) as ActiveModule[]
+        activeModules.filter(m => m.id != moduleId).forEach(m => m.setActive(false))
+        const target = activeModules.find(m => m.id)
+        if (target) target.setActive(toggle ? !target.isActive : true)
+    }
 }
 
 class DataStore {
@@ -167,5 +196,5 @@ class DataStore {
     }
 }
 
-export { Module, Bench }
+export { Module, ActiveModule, Bench }
 
