@@ -142,10 +142,8 @@ class Bench {
             }
             //first time rendering
             for (const m of sorted) m.setState({})
-            return true
         } catch (e) {
             console.info('start stopped', e)
-            return false
         }
     }
 
