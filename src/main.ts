@@ -9,5 +9,7 @@ const test = new Test().set({
     name: 'shenzhijie'
 })
 
+test.appendTo('body')
+
 Object.assign(window, { test })
 
