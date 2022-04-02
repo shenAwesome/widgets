@@ -44,7 +44,7 @@ abstract class Widget {
             k.startsWith('_') || excluded.includes(k) || (this as any)[k] instanceof Function
         ))
         const self = this,
-            { root: root, _state: state } = this
+            { root, _state: state } = this
         await this.init(root)
         //changing property triggers render()
         keys.forEach(key => {
@@ -53,6 +53,9 @@ abstract class Widget {
                 get() { return state[key] },
                 set(newValue) {
                     state[key] = newValue
+                    if (self._isRendering) {
+                        throw `property '${key}' changed inside render()`
+                    }
                     self.requestRender()
                 }
             })
@@ -142,6 +145,10 @@ abstract class Widget {
 class Test extends Widget {
     age = 100
     name = 'haha'
+
+    protected async init(root: HTMLDivElement) {
+        console.log('init', this.name)
+    }
 
     protected render(root: HTMLDivElement): void | Action {
         const { onChange, addCleanup, name, age } = this

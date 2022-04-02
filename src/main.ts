@@ -5,7 +5,9 @@ import { Test } from "./Widget"
 
 //testModule()
 
-const test = new Test()
+const test = new Test().set({
+    name: 'shenzhijie'
+})
 
 Object.assign(window, { test })
 
