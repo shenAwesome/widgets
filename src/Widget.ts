@@ -39,12 +39,6 @@ abstract class Widget {
         this.requestRender = _.debounce(this.requestRender, 20)
     }
 
-    private _cleanup() {
-        const cleanups = this._store.cleanups
-        cleanups.forEach(c => c())
-        cleanups.length = 0
-    }
-
     private async initComponent(excluded: string[]) {
         const self = this,
             { root } = this,
@@ -118,17 +112,20 @@ abstract class Widget {
 
     protected requestRender() {
         const { _store: store } = this
-
         const hasChange = Object.entries(store.state).some(
             ([key, val]) => val !== store.lastRenderedState[key])
-        if (!hasChange) return
-
-        store.isRendering = true
-        this._cleanup()
-        this.addCleanup(this.render(this.root) as any)
-        store.lastRenderedState = { ...this._store.state }
-        store.isRendering = false
-        store.changeHandlers.forEach(c => c(this))
+        if (hasChange) {
+            store.isRendering = true
+            //cleanup
+            const { cleanups } = store
+            cleanups.forEach(c => c())
+            cleanups.length = 0
+            //render
+            this.addCleanup(this.render(this.root) as any)
+            store.lastRenderedState = { ...this._store.state }
+            store.isRendering = false
+            store.changeHandlers.forEach(c => c(this))
+        }
     }
 
     /**
