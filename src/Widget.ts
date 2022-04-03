@@ -18,12 +18,16 @@ class Cache {
 type Action = () => void
 
 abstract class Widget {
-    private _cache = new Cache
-    private _changeHandlers = [] as Function[]
-    private _cleanups = [] as Action[]
-    private _isRendering = false
-    private _lastRenderedState = {} as any
-    private readonly _state = {} as any
+
+    private _store = {
+        cache: new Cache,
+        changeHandlers: [] as Function[],
+        cleanups: [] as Action[],
+        isRendering: false,
+        lastRenderedState: {} as any,
+        state: {} as any
+    }
+
     public className = 'Widget'
     public readonly root = document.createElement('div')
 
@@ -35,28 +39,30 @@ abstract class Widget {
         this.requestRender = _.debounce(this.requestRender, 20)
     }
 
-    private _doCleanup() {
-        const cleanups = this._cleanups
+    private _cleanup() {
+        const cleanups = this._store.cleanups
         cleanups.forEach(c => c())
         cleanups.length = 0
     }
 
     private async initComponent(excluded: string[]) {
-        this.root.classList.add(this.className)
+        const self = this,
+            { root } = this,
+            state = this._store.state
+
+        root.classList.add(this.className)
+        await this.init(root)
+        //changing property triggers render()
         const keys = Object.keys(this).filter(k => !(
             k.startsWith('_') || excluded.includes(k) || (this as any)[k] instanceof Function
         ))
-        const self = this,
-            { root, _state: state } = this
-        await this.init(root)
-        //changing property triggers render()
         keys.forEach(key => {
             state[key] = (this as any)[key]
             Object.defineProperty(this, key, {
                 get() { return state[key] },
                 set(newValue) {
                     state[key] = newValue
-                    if (self._isRendering) {
+                    if (self._store.isRendering) {
                         throw `property '${key}' changed inside render()`
                     }
                     self.requestRender()
@@ -66,33 +72,24 @@ abstract class Widget {
         this.requestRender()
     }
 
-    private onChange(handler: (obj: typeof this) => void) {
-        const handlers = this._changeHandlers
-        handlers.push(handler)
-        return {
-            remove: () => _.pull(handlers, handler)
-        }
-    }
-
     /**
      * can only be called in render() 
      */
     protected addCleanup(action: Action) {
-        if (!this._isRendering) throw "addCleanup can only be called in render()"
-        if (action) this._cleanups.push(action)
+        if (!this._store.isRendering) throw "addCleanup can only be called in render()"
+        if (action) this._store.cleanups.push(action)
     }
 
     /**
      * can only be called in render() 
      */
     protected changed(props: [keyof this], action: Action) {
-        if (!this._isRendering) throw "changed can only be called in render()"
+        const { _store: store } = this
+        if (!store.isRendering) throw "changed can only be called in render()"
         const hasChanged = (key: keyof this) => {
-            return this._lastRenderedState[key] !== this._state[key]
+            return store.lastRenderedState[key] !== store.state[key]
         }
-        if (props.some(p => hasChanged(p))) {
-            action()
-        }
+        if (props.some(p => hasChanged(p))) action()
     }
 
     /**
@@ -104,11 +101,11 @@ abstract class Widget {
     protected async init(root: HTMLDivElement) { }
 
     protected async memo<T>(key: string, factory: () => Promise<T>) {
-        return this._cache.get(key, factory) as Promise<T>
+        return this._store.cache.get(key, factory) as Promise<T>
     }
 
     protected async memoClear() {
-        return this._cache.clear()
+        return this._store.cache.clear()
     }
 
     /**
@@ -120,16 +117,18 @@ abstract class Widget {
     protected abstract render(root: HTMLDivElement): Action | void
 
     protected requestRender() {
-        const hasChange = Object.entries(this._state).some(
-            ([key, val]) => val !== this._lastRenderedState[key])
+        const { _store: store } = this
+
+        const hasChange = Object.entries(store.state).some(
+            ([key, val]) => val !== store.lastRenderedState[key])
         if (!hasChange) return
 
-        this._isRendering = true
-        this._doCleanup()
+        store.isRendering = true
+        this._cleanup()
         this.addCleanup(this.render(this.root) as any)
-        this._lastRenderedState = { ...this._state }
-        this._isRendering = false
-        this._changeHandlers.forEach(c => c(this))
+        store.lastRenderedState = { ...this._store.state }
+        store.isRendering = false
+        store.changeHandlers.forEach(c => c(this))
     }
 
     /**
@@ -141,6 +140,14 @@ abstract class Widget {
             container = document.querySelector(container) as HTMLElement
         }
         container.appendChild(this.root)
+    }
+
+    public onChange(handler: (obj: typeof this) => void) {
+        const handlers = this._store.changeHandlers
+        handlers.push(handler)
+        return {
+            remove: () => _.pull(handlers, handler)
+        }
     }
 
     /**
