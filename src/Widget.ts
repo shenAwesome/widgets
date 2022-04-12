@@ -28,6 +28,8 @@ abstract class Widget {
         state: {} as any
     }
 
+    options = {}
+
     public className = 'Widget'
     public readonly root = document.createElement('div')
 
@@ -166,7 +168,10 @@ abstract class Widget {
     * @param properties 
     */
     public set(properties: Partial<this>) {
+        const { options } = this
         Object.assign(this, properties)
+        const newOptions = (properties as any)['options']
+        this.options = { ...options, ...newOptions }
         return this
     }
 }
@@ -176,6 +181,7 @@ class Test extends Widget {
     public age = 100
     public className = 'TestWidget'
     public name = 'haha'
+
 
     protected async init(root: HTMLDivElement) {
         console.log('init', this.name)
