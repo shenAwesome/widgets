@@ -32,8 +32,10 @@ abstract class Widget {
     public readonly root = document.createElement('div')
 
     constructor() {
-        this.changed = this.changed.bind(this)
+        this.ifChanged = this.ifChanged.bind(this)
         this.addCleanup = this.addCleanup.bind(this)
+        this.find = this.find.bind(this)
+
         const excluded = Object.keys(this)
         setTimeout(() => this.initComponent(excluded))
         this.requestRender = _.debounce(this.requestRender, 20)
@@ -77,13 +79,17 @@ abstract class Widget {
     /**
      * can only be called in render() 
      */
-    protected changed(props: [keyof this], action: Action) {
+    protected ifChanged(props: [keyof this], action: Action) {
         const { _store: store } = this
         if (!store.isRendering) throw "changed can only be called in render()"
         const hasChanged = (key: keyof this) => {
             return store.lastRenderedState[key] !== store.state[key]
         }
         if (props.some(p => hasChanged(p))) action()
+    }
+
+    protected find(selector: string) {
+        return this.root.querySelector(selector)
     }
 
     /**
@@ -176,13 +182,71 @@ class Test extends Widget {
     }
 
     protected render(root: HTMLDivElement): void | Action {
-        const { changed, addCleanup, name, age } = this
-        changed(['name'], () => {
+        const { ifChanged, addCleanup, name, age } = this
+        ifChanged(['name'], () => {
             console.log(name)
         })
-        changed(['age'], () => {
+        ifChanged(['age'], () => {
             console.log(age)
         })
+    }
+}
+
+interface TreeNode {
+    hidden?: boolean
+}
+
+interface TreeProver {
+    getNode(id: string): TreeNode
+    getChildren(id: string): string[]
+}
+
+class Tree extends Widget {
+    selected = [] as string[]
+    expanded = [] as string[]
+    options = {
+        checkboxOnly: false
+    }
+
+    constructor(public provider: TreeProver) {
+        super()
+    }
+
+    protected async init(root: HTMLDivElement) {
+
+    }
+
+    protected render(root: HTMLDivElement): void | Action {
+        this.renderNode(null)
+    }
+
+    private renderNode(id: string) {
+        const { provider } = this,
+            element = document.createElement('div'),
+            mainNode = provider.getNode(id),
+            selected = this.selected.includes(id),
+            expanded = this.expanded.includes(id)
+        element.appendChild(this.toHtml(mainNode, selected))
+        if (expanded) {
+            const children = provider.getChildren(id).map(cid => this.renderNode(cid))
+            const childPanel = document.createElement('div')
+            children.forEach(c => childPanel.appendChild(c))
+            element.appendChild(childPanel)
+        }
+        return element
+    }
+
+    private toHtml(node: TreeNode, selected: boolean) {
+        const element = document.createElement('div')
+        return element
+    }
+
+    getAncestors(id: string) {
+        return [] as string[]
+    }
+
+    getDecendants(id: string) {
+        return [] as string[]
     }
 }
 
